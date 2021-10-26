@@ -1,1 +1,13 @@
+ciftify_container: $SINGULARITY_DIR/bids-apps/tigrlab_fmriprep_ciftify_v1.3.2-2.3.3.sif
+
+cleaned_dir: 
+
+analysis_dir: 
+
+left-surface: config/template.L.inflated.32k_fs_LR.surf.gii
+
+right-surface: config/template.R.inflated.32k_fs_LR.surf.gii
+
+schaefer_1000_labels: config/Schaefer2018_400Parcels_7Networks_order.dlabel.nii
+
 
