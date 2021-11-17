@@ -1,1 +1,70 @@
+from os.path import join
+from glob import glob
+import pandas as pd
 
+configfile: 'config/config.yml'
+
+#load participants.tsv file (list of HCP subject IDs),
+df = pd.read_table(config['participants_tsv'])
+subjects = df.participant_id.to_list() 
+
+seed = config['seed']
+vox_res = config['voxel_size']
+
+wildcard_constraints:
+    subject="[a-zA-Z0-9]+",
+    seed='BASF'
+
+rule all:
+    input: 
+        dtseries = expand('results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii',subject=subjects),
+        nifti = expand('results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.nii.gz', seed=seed,vox_res=vox_res),
+        cifti = expand('results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.dlabel.nii', seed=seed,vox_res=vox_res),
+        ptseries = expand('results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-{seed}_{vox_res}_Schaefer.ptseries.nii',subject=subjects,seed=seed,vox_res=vox_res),
+        #corr_matrix = expand('results/sub-{subject}/sub-{subject}_Schaefer_corr-matrix.npy',subject=subjects)
+
+#Copy the clean rsfMRI data
+rule copy_dtseries:
+    input: dtseries_data = '/project/6050199/rhaast/03_Ongoing/basal_forebrain/results/funcparc_icafix/sub-{subject}/fmri/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii' 
+    output: 
+        dtseries = 'results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii'
+    group: 'participant'
+    shell: 
+        'cp -v {input} {output}'
+
+rule create_atlas:
+    input:
+        atlas = config['merge_roi'],
+        labels = config['subcort_labels'],
+        lh = config['lh_sch'],
+        rh = config['rh_sch']
+    output:
+        nifti = 'results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.nii.gz',
+        cifti = 'results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.dlabel.nii'
+    group: 'atlas'
+    singularity: config['singularity_connectomewb']
+    shell:
+        'wb_command -volume-label-import {input.atlas} {input.labels} {output.nifti} &&'
+        'wb_command -cifti-create-label {output.cifti} -volume {output.nifti} {output.nifti} -left-label {input.lh} -right-label {input.rh}'
+
+rule parcellate_tseries:
+    input:
+        dtseries = rules.copy_dtseries.output,
+        rois = rules.create_atlas.output.cifti
+    output: ptseries = 'results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-{seed}_{vox_res}_Schaefer.ptseries.nii'
+    group: 'preprocessing'
+    singularity: config['singularity_connectomewb']
+    threads: 8
+    resources:
+        mem_mb = 32000
+    shell:
+        'wb_command -cifti-parcellate {input.dtseries} {input.rois} COLUMN {output}'
+
+
+#Calculating connectivity matrices
+#rule compute_correlation:
+#    input: cleaned_bold = rules.copy_dtseries.output
+#    params: seed = config['seed']
+#    output: corr_matrix = 'results/sub-{subject}/sub-{subject}_Schaefer_corr-matrix.npy'
+#    group: 'participant'
+#    script: 'scripts/get_correlation.py'

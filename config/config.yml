@@ -1,13 +1,21 @@
-ciftify_container: $SINGULARITY_DIR/bids-apps/tigrlab_fmriprep_ciftify_v1.3.2-2.3.3.sif
+participants_tsv: 'config/participants.tsv'
 
-cleaned_dir: 
+rhaast_dir: /project/6050199/rhaast/03_Ongoing/basal_forebrain/results/funcparc_icafix/
 
-analysis_dir: 
+voxel_size: 1p6mm
+seed: BASF
 
-left-surface: config/template.L.inflated.32k_fs_LR.surf.gii
+seed_roi: resources/seed_1p6mm.nii.gz
+merge_roi: resources/seed-BASF_BigBrain1p6mm.nii.gz
+subcort_atlas: resources/sub-MNI2009b_desc-allFSstyle_workbench.nii.gz
+subcort_labels: resources/sub-MNI2009b_desc-allFSstyle_labels.txt
+lh_sch: resources/lh.Schaefer2018_400Parcels_7Networks_fsLR32k.label.gii
+rh_sch: resources/rh.Schaefer2018_400Parcels_7Networks_fsLR32k.label.gii
 
-right-surface: config/template.R.inflated.32k_fs_LR.surf.gii
+schaefer_400_labels: resources/Schaefer2018_400Parcels_7Networks_order.dlabel.nii
 
-schaefer_1000_labels: config/Schaefer2018_400Parcels_7Networks_order.dlabel.nii
+singularity_neuroglia: /project/6050199/akhanf/singularity/bids-apps/khanlab_neuroglia-core_latest.sif
+singularity_connectomewb: /project/6050199/akhanf/singularity/connectome-workbench_latest.simg
+singularity_ciftify: /project/6050199/akhanf/singularity/bids-apps/tigrlab_fmriprep_ciftify_v1.3.2-2.3.3.sif
 
-
+max_k: 8
