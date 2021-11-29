@@ -9,8 +9,8 @@ seed_roi: resources/seed_1p6mm.nii.gz
 merge_roi: resources/seed-BASF_BigBrain1p6mm.nii.gz
 subcort_atlas: resources/sub-MNI2009b_desc-allFSstyle_workbench.nii.gz
 subcort_labels: resources/sub-MNI2009b_desc-allFSstyle_labels.txt
-lh_sch: resources/lh.Schaefer2018_400Parcels_7Networks_fsLR32k.label.gii
-rh_sch: resources/rh.Schaefer2018_400Parcels_7Networks_fsLR32k.label.gii
+lh_sch: resources/Left.Schaefer2019_400Parcels_7Network_fsLR59k.label.gii
+rh_sch: resources/Right.Schaefer2019_400Parcels_7Network_fsLR59k.label.gii
 
 schaefer_400_labels: resources/Schaefer2018_400Parcels_7Networks_order.dlabel.nii
 

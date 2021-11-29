@@ -17,21 +17,21 @@ wildcard_constraints:
 
 rule all:
     input: 
-        dtseries = expand('results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii',subject=subjects),
-        nifti = expand('results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.nii.gz', seed=seed,vox_res=vox_res),
-        cifti = expand('results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.dlabel.nii', seed=seed,vox_res=vox_res),
-        ptseries = expand('results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-{seed}_{vox_res}_Schaefer.ptseries.nii',subject=subjects,seed=seed,vox_res=vox_res),
-        #corr_matrix = expand('results/sub-{subject}/sub-{subject}_Schaefer_corr-matrix.npy',subject=subjects)
+       # dtseries = expand('results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii',subject=subjects),
+       # nifti = expand('results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}_59k.nii.gz', seed=seed,vox_res=vox_res),
+       # cifti = expand('results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}_59k.dlabel.nii', seed=seed,vox_res=vox_res),
+       # ptseries = expand('results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-{seed}_{vox_res}_Schaefer.ptseries.nii',subject=subjects,seed=seed,vox_res=vox_res),
+       # corr_matrix = expand('results/sub-{subject}/sub-{subject}_Schaefer_correlation_matrix_seed-{seed}_{vox_res}.npz',subject=subjects,seed=seed,vox_res=vox_res),
+        corr_group = 'results/clustering/correlation_matrix_Schaefer_group.npz'
 
 #Copy the clean rsfMRI data
 rule copy_dtseries:
-    input: dtseries_data = '/project/6050199/rhaast/03_Ongoing/basal_forebrain/results/funcparc_icafix/sub-{subject}/fmri/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii' 
-    output: 
-        dtseries = 'results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii'
+    input: '/project/6050199/rhaast/03_Ongoing/basal_forebrain/results/funcparc_icafix/sub-{subject}/fmri/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii' 
+    output: 'results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-BASF_1p6mm_59k_fs_LR.dtseries.nii'
     group: 'participant'
     shell: 
         'cp -v {input} {output}'
-
+        
 rule create_atlas:
     input:
         atlas = config['merge_roi'],
@@ -39,8 +39,8 @@ rule create_atlas:
         lh = config['lh_sch'],
         rh = config['rh_sch']
     output:
-        nifti = 'results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.nii.gz',
-        cifti = 'results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}.dlabel.nii'
+        nifti = 'results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}_59k.nii.gz',
+        cifti = 'results/atlas/seed-{seed}_Schaefer_BigBrain{vox_res}_59k.dlabel.nii'
     group: 'atlas'
     singularity: config['singularity_connectomewb']
     shell:
@@ -51,20 +51,39 @@ rule parcellate_tseries:
     input:
         dtseries = rules.copy_dtseries.output,
         rois = rules.create_atlas.output.cifti
-    output: ptseries = 'results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-{seed}_{vox_res}_Schaefer.ptseries.nii'
+    output: 'results/sub-{subject}/rfMRI_REST_7T_cleaned+.seed-{seed}_{vox_res}_Schaefer.ptseries.nii'
     group: 'preprocessing'
     singularity: config['singularity_connectomewb']
     threads: 8
     resources:
         mem_mb = 32000
     shell:
-        'wb_command -cifti-parcellate {input.dtseries} {input.rois} COLUMN {output}'
-
+        'wb_command -cifti-parcellate {input.dtseries} {input.rois} COLUMN {output} -only-numeric'
 
 #Calculating connectivity matrices
-#rule compute_correlation:
-#    input: cleaned_bold = rules.copy_dtseries.output
-#    params: seed = config['seed']
-#    output: corr_matrix = 'results/sub-{subject}/sub-{subject}_Schaefer_corr-matrix.npy'
-#    group: 'participant'
-#    script: 'scripts/get_correlation.py'
+rule compute_correlation:
+    input:
+        ptseries = rules.parcellate_tseries.output[0],
+        vol = rules.copy_dtseries.output[0]
+    params:
+        seed = config['seed']
+    output: 'results/sub-{subject}/sub-{subject}_Schaefer_correlation_matrix_seed-{seed}_{vox_res}.npz'
+    group: 'preprocessing'
+    script: 'scripts/compute_correlation.py'
+
+rule combine_correlation:
+    input: expand('results/sub-{subject}/sub-{subject}_Schaefer_correlation_matrix_seed-{seed}_{vox_res}.npz',subject=subjects,seed=seed,vox_res=vox_res,allow_missing=True)
+    output: 'results/clustering/correlation_matrix_Schaefer_group.npz'
+    group: 'clustering'
+    run:
+        import numpy as np
+
+        data = np.load(input[0])
+        nsubjects = len(input)
+        combined = np.zeros([nsubjects,data['corr'].shape[0],data['corr'].shape[1]])
+
+        for i,npz in enumerate(input):
+            data = np.load(npz)
+            combined[i,:,:] = data['corr']
+
+        np.savez(output[0], corr_group=combined,indices=data['indices'])
